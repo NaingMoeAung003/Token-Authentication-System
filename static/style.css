@@ -1,0 +1,203 @@
+/* --- Google Font Import --- */
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap');
+
+/* --- General Body & Background Styling --- */
+body {
+    font-family: 'Roboto Mono', monospace;
+    background-color: #0a192f; /* Deep Navy Blue */
+    color: #ccd6f6; /* Light Slate Grey */
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-size: 16px;
+    overflow: hidden; /* Hide scrollbars from background effect */
+}
+
+/* Optional: Subtle animated background */
+body::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(transparent, rgba(0,0,0,0.5)), 
+                repeating-linear-gradient(0deg, 
+                    rgba(100, 255, 218, 0.1) 0px, rgba(100, 255, 218, 0.1) 1px, 
+                    transparent 1px, transparent 20px);
+    z-index: -1;
+    animation: scanlines 20s linear infinite;
+}
+
+@keyframes scanlines {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100%; }
+}
+
+
+/* --- Form & Content Container --- */
+.form-container {
+    background-color: #112240; /* Lighter Navy */
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    border: 1px solid #64ffda40;
+    width: 100%;
+    max-width: 500px;
+    z-index: 1;
+    text-align: center;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* Custom scrollbar for container */
+.form-container::-webkit-scrollbar {
+  width: 8px;
+}
+.form-container::-webkit-scrollbar-track {
+  background: #0a192f;
+}
+.form-container::-webkit-scrollbar-thumb {
+  background-color: #64ffda;
+  border-radius: 20px;
+  border: 3px solid #0a192f;
+}
+
+h1 {
+    color: #64ffda; /* Cyan Accent */
+    margin-bottom: 2rem;
+    font-weight: 500;
+}
+
+h2 {
+    color: #64ffda;
+    border-bottom: 1px solid #233554;
+    padding-bottom: 10px;
+    margin-top: 2rem;
+}
+
+/* --- Form Elements --- */
+.form-group {
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #8892b0; /* Slate */
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    background-color: #0a192f;
+    border: 1px solid #233554; /* Darker Slate */
+    border-radius: 4px;
+    color: #ccd6f6;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 16px;
+    box-sizing: border-box; /* Important for padding */
+    transition: all 0.25s ease;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
+    outline: none;
+    border-color: #64ffda;
+    box-shadow: 0 0 10px rgba(100, 255, 218, 0.2);
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    background-color: transparent;
+    border: 1px solid #64ffda;
+    color: #64ffda;
+    border-radius: 4px;
+    font-size: 16px;
+    font-family: 'Roboto Mono', monospace;
+    cursor: pointer;
+    transition: background-color 0.25s ease, color 0.25s ease;
+    margin-top: 1rem;
+}
+
+button:hover {
+    background-color: rgba(100, 255, 218, 0.1);
+}
+
+/* --- Links & Paragraphs --- */
+p {
+    color: #8892b0;
+}
+
+a {
+    color: #64ffda;
+    text-decoration: none;
+    transition: color 0.25s ease;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* --- Response Boxes --- */
+.response-box {
+    margin-top: 1.5rem;
+    padding: 15px;
+    border-radius: 4px;
+    text-align: left;
+    font-size: 14px;
+    word-break: break-word;
+    border-width: 1px;
+    border-style: solid;
+}
+
+.success {
+    background-color: rgba(100, 255, 218, 0.1);
+    border-color: #64ffda;
+    color: #64ffda;
+}
+
+.error {
+    background-color: rgba(255, 115, 115, 0.1);
+    border-color: #ff7373;
+    color: #ff7373;
+}
+
+pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 13px;
+    margin-top: 5px;
+    color: #ccd6f6;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #233554;
+    margin: 2rem 0;
+}
+
+/* --- CAPTCHA Styling --- */
+.captcha-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #0a192f;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #233554;
+}
+.captcha-group label {
+    margin-bottom: 0;
+    font-size: 1.2rem;
+    color: #ccd6f6;
+}
+.captcha-group input {
+    width: 80px;
+    text-align: center;
+    font-size: 1.2rem;
+}
+

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Profile</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="form-container">
+        <h1 id="welcome-message">Loading Secure Data...</h1>
+        <div id="profile-data" class="response-box success"></div>
+        
+        <hr>
+
+        <div class="rbac-container">
+            <h2>Role-Based Access</h2>
+            <p>Your current role is: <strong id="user-role"></strong>.</p>
+            <button id="admin-button">Attempt Admin Access</button>
+            <div id="admin-result" class="response-box"></div>
+        </div>
+        <button id="logout-button">Logout</button>
+    </div>
+
+    <script>
+        const welcomeMessage = document.getElementById('welcome-message');
+        const profileData = document.getElementById('profile-data');
+        const logoutButton = document.getElementById('logout-button');
+        const userRole = document.getElementById('user-role');
+        const adminButton = document.getElementById('admin-button');
+        const adminResult = document.getElementById('admin-result');
+
+        const api = {
+            async get(endpoint) {
+                const accessToken = localStorage.getItem('accessToken');
+                let response = await fetch(endpoint, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+
+                if (response.status === 401) {
+                    const refreshed = await this.refreshToken();
+                    if (refreshed) {
+                        const newAccessToken = localStorage.getItem('accessToken');
+                        response = await fetch(endpoint, {
+                            headers: { 'Authorization': `Bearer ${newAccessToken}` }
+                        });
+                    } else {
+                        logout();
+                        return null;
+                    }
+                }
+                return { response, json: await response.json() };
+            },
+            async refreshToken() {
+                const refreshToken = localStorage.getItem('refreshToken');
+                if (!refreshToken) return false;
+                try {
+                    const response = await fetch('/api/auth/refresh', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refreshToken: refreshToken })
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        localStorage.setItem('accessToken', data.accessToken);
+                        return true;
+                    }
+                    return false;
+                } catch (error) { return false; }
+            }
+        };
+
+        async function fetchProfile() {
+            const accessTokenBeforeRequest = localStorage.getItem('accessToken');
+            const result = await api.get('/api/profile');
+            if (result && result.json) {
+                const data = result.json;
+                welcomeMessage.textContent = data.message;
+                userRole.textContent = data.role.toUpperCase();
+                profileData.innerHTML = `
+                    <strong>User Profile Data:</strong>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <hr>
+                    <strong>Access Token Used:</strong>
+                    <pre>${accessTokenBeforeRequest}</pre>
+                `;
+            }
+        }
+
+        async function fetchAdminData() {
+            adminResult.className = 'response-box';
+            const accessTokenBeforeRequest = localStorage.getItem('accessToken');
+            const result = await api.get('/api/admin/data');
+            
+            if (result && result.json) {
+                const data = result.json;
+                if (result.response.ok) {
+                    adminResult.classList.add('success');
+                    adminResult.innerHTML = `
+                        <strong>Access Granted!</strong>
+                        <hr>
+                        <strong>Admin Data Received:</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <hr>
+                        <strong>Access Token Used:</strong>
+                        <pre>${accessTokenBeforeRequest}</pre>
+                    `;
+                } else {
+                    adminResult.classList.add('error');
+                    adminResult.innerHTML = `
+                        <strong>Access Denied.</strong>
+                        <hr>
+                        <strong>Server Response:</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            window.location.href = window.location.origin + '/login';
+        }
+
+        logoutButton.addEventListener('click', logout);
+        adminButton.addEventListener('click', fetchAdminData);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('accessToken') || !localStorage.getItem('refreshToken')) {
+                logout();
+            } else {
+                fetchProfile();
+            }
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="form-container">
+        <h1>System Access</h1>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Authenticate</button>
+        </form>
+        <div id="message" class="response-box" style="display: none;"></div>
+        <p>Need an account? <a href="/register">Register here.</a></p>
+    </div>
+
+    <script>
+        const form = document.getElementById('login-form');
+        const messageDiv = document.getElementById('message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                localStorage.setItem('accessToken', data.accessToken);
+                localStorage.setItem('refreshToken', data.refreshToken);
+
+                messageDiv.className = 'response-box success';
+                messageDiv.innerHTML = `<strong>Authentication Successful.</strong><br>Tokens acquired. Accessing secure profile...`;
+                messageDiv.style.display = 'block';
+
+                setTimeout(() => {
+                    window.location.href = window.location.origin + '/profile';
+                }, 2000);
+
+            } else {
+                messageDiv.textContent = data.message;
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'response-box error';
+            }
+        });
+    </script>
+</body>
+</html>
+

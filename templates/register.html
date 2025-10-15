@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="form-container">
+        <h1>Create Secure Account</h1>
+        <form id="register-form">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" minlength="8" required>
+            </div>
+
+            <!-- CAPTCHA -->
+            <div class="form-group">
+                <label for="captcha">Security Check:</label>
+                 <div class="captcha-group">
+                    <label id="captcha-question"></label>
+                    <input type="text" id="captcha" name="captcha" required>
+                </div>
+            </div>
+
+            <button type="submit">Register</button>
+        </form>
+        <div id="message" class="response-box" style="display: none;"></div>
+        <p>Already have an account? <a href="/login">Login here.</a></p>
+    </div>
+
+    <script>
+        const form = document.getElementById('register-form');
+        const messageDiv = document.getElementById('message');
+        const captchaQuestion = document.getElementById('captcha-question');
+        let captchaAnswer = 0;
+
+        function generateCaptcha() {
+            const num1 = Math.floor(Math.random() * 10) + 1;
+            const num2 = Math.floor(Math.random() * 10) + 1;
+            captchaAnswer = num1 + num2;
+            captchaQuestion.textContent = `${num1} + ${num2} = ?`;
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const userAnswer = parseInt(document.getElementById('captcha').value, 10);
+
+            if (userAnswer !== captchaAnswer) {
+                messageDiv.textContent = 'Incorrect answer to security question.';
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'response-box error';
+                generateCaptcha(); // Generate a new question
+                return;
+            }
+
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
+            messageDiv.textContent = data.message;
+            messageDiv.style.display = 'block';
+
+            if (response.ok) {
+                messageDiv.className = 'response-box success';
+                setTimeout(() => {
+                    window.location.href = window.location.origin + '/login';
+                }, 2000);
+            } else {
+                messageDiv.className = 'response-box error';
+                generateCaptcha();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', generateCaptcha);
+    </script>
+</body>
+</html>
+
