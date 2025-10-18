@@ -8,80 +8,127 @@
 </head>
 <body>
     <div class="form-container">
-        <h1>Create Secure Account</h1>
+        <h1>Create Staff Account</h1>
         <form id="register-form">
             <div class="form-group">
                 <label for="username">Username:</label>
                 <input type="text" id="username" name="username" required>
             </div>
             <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" minlength="8" required>
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
             </div>
-
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <!-- NEW: Password Requirements Box -->
+            <div id="password-reqs" class="password-reqs">
+                <div id="req-length" class="req-item">8+ Characters</div>
+                <div id="req-number" class="req-item">1+ Number</div>
+                <div id="req-special" class="req-item">1+ Special</div>
+            </div>
+            <div class="form-group">
+                <label for="confirm-password">Confirm Password:</label>
+                <input type="password" id="confirm-password" name="confirm-password" required>
+            </div>
             <!-- CAPTCHA -->
             <div class="form-group">
-                <label for="captcha">Security Check:</label>
-                 <div class="captcha-group">
-                    <label id="captcha-question"></label>
-                    <input type="text" id="captcha" name="captcha" required>
+                <div id="recaptcha-container" class="recaptcha-container">
+                    <div class="recaptcha-checkbox"><input type="checkbox" id="captcha-checkbox"><div class="checkmark"></div><div class="spinner"></div></div>
+                    <label for="captcha-checkbox" class="recaptcha-label">I'm not a robot</label>
+                    <div class="recaptcha-logo">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"><path fill="#8892b0" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.5 15.5V16h3v1.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5zM12 4c1.93 0 3.5 1.57 3.5 3.5S13.93 11 12 11s-3.5-1.57-3.5-3.5S10.07 4 12 4zm4.5 7.5H15V13c0 1.1-.9 2-2 2h-2c-1.1 0-2-.9-2-2v-1.5H7.5c-.83 0-1.5-.67-1.5-1.5S6.67 8.5 7.5 8.5h1.5V7c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v1.5h1.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/></svg>
+                        <div class="recaptcha-text"><span>reCAPTCHA</span><small>Privacy - Terms</small></div>
+                    </div>
                 </div>
             </div>
-
-            <button type="submit">Register</button>
+            <button type="submit" id="register-button" disabled>Register</button>
         </form>
         <div id="message" class="response-box" style="display: none;"></div>
         <p>Already have an account? <a href="/login">Login here.</a></p>
     </div>
-
     <script>
         const form = document.getElementById('register-form');
         const messageDiv = document.getElementById('message');
-        const captchaQuestion = document.getElementById('captcha-question');
-        let captchaAnswer = 0;
+        const captchaCheckbox = document.getElementById('captcha-checkbox');
+        const registerButton = document.getElementById('register-button');
+        const recaptchaContainer = document.getElementById('recaptcha-container');
+        const passwordInput = document.getElementById('password');
+        const reqs = {
+            length: document.getElementById('req-length'),
+            number: document.getElementById('req-number'),
+            special: document.getElementById('req-special')
+        };
+        let passwordIsValid = false;
 
-        function generateCaptcha() {
-            const num1 = Math.floor(Math.random() * 10) + 1;
-            const num2 = Math.floor(Math.random() * 10) + 1;
-            captchaAnswer = num1 + num2;
-            captchaQuestion.textContent = `${num1} + ${num2} = ?`;
+        // --- Password Validation Logic ---
+        passwordInput.addEventListener('input', () => {
+            const pass = passwordInput.value;
+            const hasLength = pass.length >= 8;
+            const hasNumber = /\d/.test(pass);
+            const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+            
+            reqs.length.className = hasLength ? 'req-item valid' : 'req-item';
+            reqs.number.className = hasNumber ? 'req-item valid' : 'req-item';
+            reqs.special.className = hasSpecial ? 'req-item valid' : 'req-item';
+            
+            passwordIsValid = hasLength && hasNumber && hasSpecial;
+            updateRegisterButtonState();
+        });
+        
+        // --- CAPTCHA Logic ---
+        captchaCheckbox.addEventListener('change', () => {
+            if (captchaCheckbox.checked) {
+                recaptchaContainer.classList.add('verifying');
+                setTimeout(() => {
+                    recaptchaContainer.classList.remove('verifying');
+                    if (captchaCheckbox.checked) recaptchaContainer.classList.add('verified');
+                    updateRegisterButtonState();
+                }, 1500);
+            } else {
+                recaptchaContainer.classList.remove('verified');
+                updateRegisterButtonState();
+            }
+        });
+
+        function updateRegisterButtonState() {
+            registerButton.disabled = !(passwordIsValid && captchaCheckbox.checked && recaptchaContainer.classList.contains('verified'));
         }
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const userAnswer = parseInt(document.getElementById('captcha').value, 10);
-
-            if (userAnswer !== captchaAnswer) {
-                messageDiv.textContent = 'Incorrect answer to security question.';
-                messageDiv.style.display = 'block';
-                messageDiv.className = 'response-box error';
-                generateCaptcha(); // Generate a new question
-                return;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            if (passwordInput.value !== confirmPassword) {
+                showMessage('Passwords do not match.', true); return;
+            }
+            if (!passwordIsValid) {
+                showMessage('Password does not meet all requirements.', true); return;
             }
 
-            const response = await fetch('/api/auth/register', {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+
+            const response = await fetch('/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, email, password: passwordInput.value })
             });
             const data = await response.json();
-            messageDiv.textContent = data.message;
-            messageDiv.style.display = 'block';
+            showMessage(data.message, !response.ok);
 
-            if (response.ok) {
-                messageDiv.className = 'response-box success';
-                setTimeout(() => {
-                    window.location.href = window.location.origin + '/login';
-                }, 2000);
-            } else {
-                messageDiv.className = 'response-box error';
-                generateCaptcha();
+            if (!response.ok) {
+                captchaCheckbox.checked = false;
+                recaptchaContainer.classList.remove('verified');
+                updateRegisterButtonState();
             }
         });
 
-        document.addEventListener('DOMContentLoaded', generateCaptcha);
+        function showMessage(msg, isError = false) {
+            messageDiv.textContent = msg;
+            messageDiv.className = isError ? 'response-box error' : 'response-box success';
+            messageDiv.style.display = 'block';
+        }
     </script>
 </body>
 </html>

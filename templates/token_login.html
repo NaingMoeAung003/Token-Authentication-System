@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login with Token</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="form-container">
+        <h1>Login with Existing Token</h1>
+        <p>This page demonstrates how a valid authentication token can be used to directly access a protected area.</p>
+        <form id="token-form">
+            <div class="form-group">
+                <label for="token">Authentication Token:</label>
+                <textarea id="token" rows="6" required placeholder="Paste your authentication token here..."></textarea>
+            </div>
+            <button type="submit">Access Dashboard</button>
+        </form>
+        <div id="message" class="response-box" style="display: none;"></div>
+        <p>Don't have a token? <a href="/login">Login here.</a></p>
+    </div>
+    <script>
+        const tokenForm = document.getElementById('token-form');
+        const tokenTextarea = document.getElementById('token');
+        const messageDiv = document.getElementById('message');
+
+        tokenForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const token = tokenTextarea.value.trim();
+            if (!token) {
+                showMessage('Token cannot be empty.', true);
+                return;
+            }
+            // Store the provided token and attempt to access the dashboard
+            localStorage.setItem('authToken', token);
+            window.location.href = '/dashboard';
+        });
+
+        function showMessage(msg, isError = false) {
+            messageDiv.textContent = msg;
+            messageDiv.className = isError ? 'response-box error' : 'response-box success';
+            messageDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
+

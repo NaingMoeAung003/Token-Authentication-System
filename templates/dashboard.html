@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="form-container">
+        <a href="/" class="back-link">← Back to Home</a>
+        <h1 id="welcome-message">Loading...</h1>
+        <div id="dashboard-data" class="response-box success"></div>
+        <div id="token-expiration" class="response-box" style="margin-top: 1rem;"></div>
+        <hr>
+        
+        <div id="mfa-setup-view">
+            <h2>Two-Factor Authentication (2FA)</h2>
+            <div id="mfa-status"></div>
+            <div id="mfa-enable-view" style="display:none;">
+                <p>Scan the QR code with your authenticator app (e.g., Google Authenticator), then enter the 6-digit code to enable 2FA.</p>
+                <div id="qr-code-container"></div>
+                <form id="mfa-verify-form">
+                    <div class="form-group">
+                        <label for="mfa-code">6-Digit Code:</label>
+                        <input type="text" id="mfa-code" required maxlength="6">
+                    </div>
+                    <button type="submit">Enable 2FA</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="message" class="response-box" style="display: none;"></div>
+        <button id="logout-button">Logout</button>
+    </div>
+    <script>
+        const welcomeMessage = document.getElementById('welcome-message');
+        const dashboardData = document.getElementById('dashboard-data');
+        const tokenExpirationDiv = document.getElementById('token-expiration');
+        const mfaStatus = document.getElementById('mfa-status');
+        const mfaEnableView = document.getElementById('mfa-enable-view');
+        const qrCodeContainer = document.getElementById('qr-code-container');
+        const mfaVerifyForm = document.getElementById('mfa-verify-form');
+        const messageDiv = document.getElementById('message');
+
+        const token = localStorage.getItem('authToken');
+
+        async function fetchDashboardData() {
+            if (!token) { logout(); return; }
+            const response = await fetch('/api/dashboard-data', { headers: { 'Authorization': `Bearer ${token}` }});
+            
+            if (response.ok) {
+                const data = await response.json();
+                welcomeMessage.textContent = data.message;
+                dashboardData.innerHTML = `<strong>Token Used for Access:</strong><pre>${token}</pre>`;
+                
+                // NEW: Display token expiration time
+                const expTimestamp = data.token_exp;
+                const expDate = new Date(expTimestamp * 1000); // Convert UNIX timestamp
+                tokenExpirationDiv.innerHTML = `<strong>Token Expires At:</strong><pre>${expDate.toLocaleString()}</pre>`;
+                
+                if (data.mfa_enabled) {
+                    mfaStatus.innerHTML = '<p class="mfa-enabled">2FA is currently <strong>ENABLED</strong>.</p>';
+                    mfaEnableView.style.display = 'none';
+                } else {
+                    mfaStatus.innerHTML = '<p class="mfa-disabled">2FA is currently <strong>DISABLED</strong>.</p>';
+                    mfaEnableView.style.display = 'block';
+                    generateQrCode();
+                }
+            } else {
+                logout();
+            }
+        }
+
+        async function generateQrCode() {
+            const response = await fetch('/api/mfa/setup', {
+                method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const imageBlob = await response.blob();
+                qrCodeContainer.innerHTML = `<img src="${URL.createObjectURL(imageBlob)}" alt="Scan this QR code">`;
+            } else {
+                showMessage("Could not generate QR code.", true);
+            }
+        }
+
+        mfaVerifyForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const mfa_code = document.getElementById('mfa-code').value;
+            const response = await fetch('/api/mfa/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ mfa_code })
+            });
+            const data = await response.json();
+            showMessage(data.message, !response.ok);
+            if (response.ok) {
+                fetchDashboardData();
+            }
+        });
+        
+        function logout() {
+            localStorage.removeItem('authToken');
+            window.location.href = '/login';
+        }
+        document.getElementById('logout-button').addEventListener('click', logout);
+
+        function showMessage(msg, isError = false) {
+            messageDiv.textContent = msg;
+            messageDiv.className = isError ? 'response-box error' : 'response-box success';
+            messageDiv.style.display = 'block';
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchDashboardData);
+    </script>
+</body>
+</html>
+

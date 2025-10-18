@@ -1,79 +1,95 @@
 # Import necessary libraries
-from flask import Flask, request, jsonify, render_template, g
+from flask import Flask, request, jsonify, render_template, g, send_file
 import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, OperationFailure
 import os
-from functools import wraps # Required for creating decorators
+from functools import wraps
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import pyotp
+import qrcode
+import io
+import re
+
+# Load environment variables from .env file
+load_dotenv()
 
 # --- Initial Configuration ---
-
 app = Flask(__name__)
-# IMPORTANT: Use two different secret keys in a real application
-app.config['SECRET_KEY'] = 'your-super-secret-key-for-access-tokens'
-app.config['REFRESH_SECRET_KEY'] = 'another-super-secret-key-for-refresh-tokens'
+app.config['SECRET_KEY'] = 'your-super-secret-key-for-auth-tokens'
+app.config['ACTION_TOKEN_SECRET_KEY'] = 'a-separate-secret-key-for-action-tokens'
 
-# --- MongoDB Configuration ---
+# --- Email Configuration ---
+EMAIL_SENDER = os.environ.get('EMAIL_USER')
+EMAIL_PASSWORD = os.environ.get('EMAIL_PASS')
+
+# --- MongoDB Configuration (Robust Method) ---
 MONGO_URI = os.environ.get('MONGO_URI', "mongodb://localhost:27017/")
 
 def get_db():
     if 'db' not in g:
         try:
             g.client = MongoClient(MONGO_URI)
-            g.client.admin.command('ismaster')
             g.db = g.client['auth_system_db']
-            print("MongoDB connection successful.")
-        except ConnectionFailure as e:
-            print(f"Could not connect to MongoDB: {e}")
+        except Exception as e:
+            print(f"CRITICAL: Could not connect to MongoDB: {e}")
             raise e
     return g.db
 
 @app.teardown_appcontext
-def teardown_db(exception):
+def close_db(error):
     client = g.pop('client', None)
     if client is not None:
         client.close()
-        print("MongoDB connection closed.")
 
-# Ensure unique username index on startup
-try:
-    with app.app_context():
+with app.app_context():
+    try:
         db = get_db()
         db.users.create_index("username", unique=True)
-        print("Username index ensured.")
-except Exception as e:
-    print(f"Info: Index creation skipped (likely already exists): {e}")
-    pass
+        db.users.create_index("email", unique=True)
+    except Exception:
+        pass
 
-# --- Decorators for Role-Based Access ---
+# --- Helper Functions ---
+def send_email(recipient_email, subject, body):
+    if not EMAIL_SENDER or not EMAIL_PASSWORD: return False
+    msg = MIMEMultipart()
+    msg['From'], msg['To'], msg['Subject'] = f"System Security <{EMAIL_SENDER}>", recipient_email, subject
+    msg.attach(MIMEText(body, 'plain'))
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_SENDER, recipient_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
+
+def generate_action_token(email, action, expires_in_minutes=60):
+    payload = {'email': email, 'action': action, 'exp': datetime.now(timezone.utc) + timedelta(minutes=expires_in_minutes)}
+    return jwt.encode(payload, app.config['ACTION_TOKEN_SECRET_KEY'], algorithm='HS256')
+
+# --- Decorator for Protected Routes ---
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        db = get_db()
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({'message': 'Access token is missing or invalid'}), 401
-        token = auth_header.split(' ')[1]
+        token = None
+        if 'Authorization' in request.headers and request.headers['Authorization'].startswith('Bearer '):
+            token = request.headers['Authorization'].split(' ')[1]
+        if not token: return jsonify({'message': 'Authentication token is missing'}), 401
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            db = get_db()
             g.current_user = db.users.find_one({'username': data['sub']})
-            if not g.current_user:
-                 return jsonify({'message': 'User not found'}), 404
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Access token has expired'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'message': 'Access token is invalid'}), 401
-        return f(*args, **kwargs)
-    return decorated
-
-def admin_required(f):
-    @wraps(f)
-    @token_required
-    def decorated(*args, **kwargs):
-        if g.current_user.get('role') != 'admin':
-            return jsonify({'message': 'Admins only! Access denied.'}), 403
+            if not g.current_user: raise Exception()
+        except Exception:
+            return jsonify({'message': 'Authentication token is invalid or expired'}), 401
         return f(*args, **kwargs)
     return decorated
 
@@ -84,103 +100,151 @@ def home(): return render_template('home.html')
 def login_page(): return render_template('login.html')
 @app.route('/register')
 def register_page(): return render_template('register.html')
-@app.route('/profile')
-def profile_page(): return render_template('profile.html')
+@app.route('/dashboard')
+def dashboard_page(): return render_template('dashboard.html')
+@app.route('/token-login')
+def token_login_page(): return render_template('token_login.html')
 
 # --- API Endpoints ---
-@app.route('/api/auth/register', methods=['POST'])
+@app.route('/api/register', methods=['POST'])
 def register():
     db = get_db()
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-
-    if not username or not password:
-        return jsonify({'message': 'Username and password are required'}), 400
-    if len(password.encode('utf-8')) > 72:
-        return jsonify({'message': 'Password is too long'}), 400
-    if db.users.find_one({'username': username}):
-        return jsonify({'message': 'Username already exists'}), 409
+    username, email, password = data.get('username'), data.get('email'), data.get('password')
+    if not all([username, email, password]): return jsonify({'message': 'All fields are required'}), 400
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email): return jsonify({'message': 'Invalid email format'}), 400
+    if db.users.find_one({'$or': [{'username': username}, {'email': email}]}):
+        return jsonify({'message': 'Username or email already exists'}), 409
 
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    # Assign a default role of 'user' to new registrations
-    db.users.insert_one({"username": username, "password_hash": hashed_password, "role": "user"})
-    return jsonify({'message': 'User registered successfully'}), 201
+    db.users.insert_one({"username": username, "email": email, "password_hash": hashed_password, "is_verified": False, "mfa_enabled": False, "mfa_secret": None})
+    
+    verification_token = generate_action_token(email, 'verify_email')
+    verification_link = f"http://127.0.0.1:5000/api/verify-email?token={verification_token}"
+    send_email(email, "Verify Your Account", f"Please click the link to verify your account: {verification_link}")
+    return jsonify({'message': 'Registration successful! Please check your email to verify your account.'}), 201
 
-@app.route('/api/auth/login', methods=['POST'])
-def login():
+@app.route('/api/verify-email', methods=['GET'])
+def verify_email():
+    db = get_db()
+    token = request.args.get('token')
+    
+    title = "Verification Failed"
+    message = "The verification link is invalid or has expired. Please try registering again."
+
+    if token:
+        try:
+            payload = jwt.decode(token, app.config['ACTION_TOKEN_SECRET_KEY'], algorithms=['HS256'])
+            if payload.get('action') == 'verify_email':
+                result = db.users.update_one({'email': payload['email']}, {'$set': {'is_verified': True}})
+                if result.matched_count > 0:
+                    title = "Email Verified!"
+                    message = "Your account has been successfully verified. You can now log in."
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            pass
+            
+    return render_template('status.html', title=title, message=message)
+
+def issue_auth_token(username):
+    payload = {'sub': username, 'exp': datetime.now(timezone.utc) + timedelta(hours=1)}
+    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+
+@app.route('/api/login/step1', methods=['POST'])
+def login_step1():
     db = get_db()
     data = request.get_json()
     user = db.users.find_one({'username': data.get('username')})
-
     if not user or not bcrypt.checkpw(data.get('password').encode('utf-8'), user['password_hash']):
-        return jsonify({'message': 'Invalid credentials'}), 401
+        return jsonify({'message': 'Invalid username or password'}), 401
+    if not user.get('is_verified'): return jsonify({'message': 'Account not verified. Please check your email.'}), 403
 
-    # Create short-lived access token
-    access_payload = {
-        'sub': user['username'],
-        'role': user.get('role', 'user'), # Include role in the token
-        'iat': datetime.now(timezone.utc),
-        'exp': datetime.now(timezone.utc) + timedelta(minutes=15) # Short-lived
-    }
-    access_token = jwt.encode(access_payload, app.config['SECRET_KEY'], algorithm='HS256')
+    if user.get('mfa_enabled'):
+        return jsonify({'mfa_required': True, 'username': user['username']})
+    else:
+        token = issue_auth_token(user['username'])
+        return jsonify({'mfa_required': False, 'token': token})
 
-    # Create long-lived refresh token
-    refresh_payload = {
-        'sub': user['username'],
-        'iat': datetime.now(timezone.utc),
-        'exp': datetime.now(timezone.utc) + timedelta(days=7) # Long-lived
-    }
-    refresh_token = jwt.encode(refresh_payload, app.config['REFRESH_SECRET_KEY'], algorithm='HS256')
-
-    return jsonify({'accessToken': access_token, 'refreshToken': refresh_token})
-
-@app.route('/api/auth/refresh', methods=['POST'])
-def refresh():
+@app.route('/api/login/step2', methods=['POST'])
+def login_step2():
+    db = get_db()
     data = request.get_json()
-    refresh_token = data.get('refreshToken')
-    if not refresh_token:
-        return jsonify({'message': 'Refresh token is missing'}), 400
+    username, mfa_code = data.get('username'), data.get('mfa_code')
+    user = db.users.find_one({'username': username})
+    if not user: return jsonify({'message': 'User not found'}), 404
+    
+    totp = pyotp.TOTP(user['mfa_secret'])
+    if totp.verify(mfa_code):
+        token = issue_auth_token(user['username'])
+        return jsonify({'token': token})
+    else:
+        return jsonify({'message': 'Invalid authenticator code'}), 401
 
-    try:
-        payload = jwt.decode(refresh_token, app.config['REFRESH_SECRET_KEY'], algorithms=['HS256'])
-        db = get_db()
-        user = db.users.find_one({'username': payload['sub']})
-        if not user:
-            return jsonify({'message': 'User not found'}), 404
-        
-        # Issue a new access token
-        access_payload = {
-            'sub': user['username'],
-            'role': user.get('role', 'user'),
-            'iat': datetime.now(timezone.utc),
-            'exp': datetime.now(timezone.utc) + timedelta(minutes=15)
-        }
-        access_token = jwt.encode(access_payload, app.config['SECRET_KEY'], algorithm='HS256')
-        return jsonify({'accessToken': access_token})
-
-    except jwt.ExpiredSignatureError:
-        return jsonify({'message': 'Refresh token has expired. Please log in again.'}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({'message': 'Refresh token is invalid.'}), 401
-
-@app.route('/api/profile')
+@app.route('/api/mfa/setup', methods=['POST'])
 @token_required
-def api_profile():
-    # The user object is attached to 'g' by the decorator
+def mfa_setup():
+    db = get_db()
     user = g.current_user
-    return jsonify({
-        'message': f"Welcome {user['username']}!",
-        'data': 'This is your user profile data.',
-        'role': user.get('role', 'user')
-    })
+    if user.get('mfa_enabled'): return jsonify({'message': 'MFA is already enabled'}), 400
+    mfa_secret = pyotp.random_base32()
+    db.users.update_one({'username': user['username']}, {'$set': {'mfa_secret': mfa_secret}})
+    totp_uri = pyotp.totp.TOTP(mfa_secret).provisioning_uri(name=user['email'], issuer_name='SecureApp')
+    img = qrcode.make(totp_uri)
+    buf = io.BytesIO()
+    img.save(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
 
-@app.route('/api/admin/data')
-@admin_required
-def admin_data():
+@app.route('/api/mfa/verify', methods=['POST'])
+@token_required
+def mfa_verify():
+    db = get_db()
+    user = g.current_user
+    mfa_code = request.json.get('mfa_code')
+    totp = pyotp.TOTP(user['mfa_secret'])
+    if totp.verify(mfa_code):
+        db.users.update_one({'username': user['username']}, {'$set': {'mfa_enabled': True}})
+        return jsonify({'message': 'MFA enabled successfully!'})
+    else:
+        return jsonify({'message': 'Invalid code. MFA setup failed.'}), 400
+
+@app.route('/api/request-reset', methods=['POST'])
+def request_password_reset():
+    db = get_db()
+    email = request.json.get('email')
+    user = db.users.find_one({'email': email})
+    if user:
+        reset_token = generate_action_token(email, 'reset_password', 15)
+        reset_link = f"http://127.0.0.1:5000/login?reset_token={reset_token}"
+        send_email(email, "Password Reset Request", f"Click here to reset your password: {reset_link}")
+    return jsonify({'message': 'If an account with that email exists, a reset link has been sent.'})
+
+@app.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    db = get_db()
+    data = request.get_json()
+    token, new_password = data.get('token'), data.get('newPassword')
+    try:
+        payload = jwt.decode(token, app.config['ACTION_TOKEN_SECRET_KEY'], algorithms=['HS256'])
+        if payload.get('action') != 'reset_password': raise Exception()
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        db.users.update_one({'email': payload['email']}, {'$set': {'password_hash': hashed_password}})
+        return jsonify({'message': 'Password has been reset successfully.'})
+    except Exception:
+        return jsonify({'message': 'The reset link is invalid or has expired.'}), 401
+
+@app.route('/api/dashboard-data')
+@token_required
+def dashboard_data():
+    user = g.current_user
+    # Get the token from the header to decode its expiration
+    token = request.headers['Authorization'].split(' ')[1]
+    token_data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+    
     return jsonify({
-        'message': 'Welcome Admin!',
-        'data': 'This is top-secret data only visible to administrators.'
+        'message': f"Welcome, {user['username']}!",
+        'data': f"This is protected data for your account.",
+        'mfa_enabled': user.get('mfa_enabled'),
+        'token_exp': token_data['exp'] # Add expiration timestamp to the response
     })
 
 if __name__ == '__main__':

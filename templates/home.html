@@ -3,15 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome</title>
+    <title>Auth System</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="form-container">
         <h1>Auth System Terminal</h1>
         <p>Secure Token-Based Authentication Portal</p>
-        <a href="/login"><button>Login</button></a>
-        <a href="/register"><button>Register</button></a>
+        <div class="home-nav">
+             <a href="/login" class="home-button">Login</a>
+             <a href="/register" class="home-button">Register</a>
+        </div>
+        <hr>
+        <p>Already have a token?</p>
+        <a href="/token-login" class="home-button">Login With Token</a>
     </div>
 </body>
 </html>

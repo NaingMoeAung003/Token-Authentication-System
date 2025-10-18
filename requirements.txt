@@ -1,0 +1,7 @@
+flask
+pymongo
+pyjwt
+bcrypt
+python-dotenv
+pyotp
+qrcode[pil]

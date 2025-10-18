@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- The title will be set by the Python server -->
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="form-container">
+        <!-- The title and message are passed in from the server -->
+        <h1>{{ title }}</h1>
+        <p>{{ message }}</p>
+        
+        <!-- Provide a helpful link back to the login page -->
+        <a href="/login" class="home-button" style="margin-top: 2rem;">Proceed to Login</a>
+    </div>
+</body>
+</html>

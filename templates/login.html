@@ -8,57 +8,170 @@
 </head>
 <body>
     <div class="form-container">
-        <h1>System Access</h1>
-        <form id="login-form">
-            <div class="form-group">
-                <label for="username">Username:</label>
-                <input type="text" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit">Authenticate</button>
-        </form>
+        <!-- Step 1: Username & Password -->
+        <div id="step1-view">
+            <h1>Staff Login</h1>
+            <form id="login-step1-form">
+                <div class="form-group"><label for="username">Username:</label><input type="text" id="username" required></div>
+                <div class="form-group"><label for="password">Password:</label><input type="password" id="password" required></div>
+                <div class="form-group">
+                    <div id="recaptcha-container-login" class="recaptcha-container">
+                        <div class="recaptcha-checkbox"><input type="checkbox" id="captcha-checkbox-login"><div class="checkmark"></div><div class="spinner"></div></div>
+                        <label for="captcha-checkbox-login" class="recaptcha-label">I'm not a robot</label>
+                    </div>
+                </div>
+                <button type="submit" id="step1-button" disabled>Continue</button>
+            </form>
+            <p><a href="#" id="forgot-password-link">Forgot Password?</a></p>
+            <p>Need an account? <a href="/register">Register here.</a></p>
+        </div>
+
+        <!-- Step 2: MFA/2FA Code -->
+        <div id="step2-view" style="display: none;">
+            <h1>Two-Factor Authentication</h1>
+            <p>Enter the code from your authenticator app.</p>
+            <form id="login-step2-form">
+                <div class="form-group"><label for="mfa-code">6-Digit Code:</label><input type="text" id="mfa-code" required maxlength="6" pattern="\d{6}"></div>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+        
+        <!-- Other views for password reset -->
+        <div id="forgot-view" style="display: none;">
+             <h1>Reset Password</h1>
+            <form id="forgot-form">
+                <p>Enter your email to request a password reset link.</p>
+                <div class="form-group"><label for="email">Email:</label><input type="email" id="email" required></div>
+                <button type="submit">Request Reset</button>
+            </form>
+            <p><a href="#" id="back-to-login-link">Back to Login</a></p>
+        </div>
+        <div id="reset-view" style="display: none;">
+            <h1>Set New Password</h1>
+            <form id="reset-form">
+                <div class="form-group"><label for="new-password">New Password:</label><input type="password" id="new-password" required></div>
+                <button type="submit">Set Password</button>
+            </form>
+        </div>
+
         <div id="message" class="response-box" style="display: none;"></div>
-        <p>Need an account? <a href="/register">Register here.</a></p>
     </div>
-
     <script>
-        const form = document.getElementById('login-form');
+        const step1View = document.getElementById('step1-view');
+        const step2View = document.getElementById('step2-view');
+        const forgotView = document.getElementById('forgot-view');
+        const resetView = document.getElementById('reset-view');
         const messageDiv = document.getElementById('message');
+        let currentUsername = null;
+        let resetToken = null;
 
-        form.addEventListener('submit', async (e) => {
+        // --- View Switching ---
+        function showView(view) {
+            step1View.style.display = 'none';
+            step2View.style.display = 'none';
+            forgotView.style.display = 'none';
+            resetView.style.display = 'none';
+            view.style.display = 'block';
+        }
+
+        document.getElementById('forgot-password-link').addEventListener('click', (e) => { e.preventDefault(); showView(forgotView); });
+        document.getElementById('back-to-login-link').addEventListener('click', (e) => { e.preventDefault(); showView(step1View); });
+
+        // --- CAPTCHA Logic ---
+        const captchaCheckbox = document.getElementById('captcha-checkbox-login');
+        const recaptchaContainer = document.getElementById('recaptcha-container-login');
+        const step1Button = document.getElementById('step1-button');
+        captchaCheckbox.addEventListener('change', () => {
+            if (captchaCheckbox.checked) {
+                recaptchaContainer.classList.add('verifying');
+                setTimeout(() => {
+                    recaptchaContainer.classList.remove('verifying');
+                    if (captchaCheckbox.checked) recaptchaContainer.classList.add('verified');
+                    step1Button.disabled = !recaptchaContainer.classList.contains('verified');
+                }, 1500);
+            } else {
+                recaptchaContainer.classList.remove('verified');
+                step1Button.disabled = true;
+            }
+        });
+
+        // --- Form Submissions ---
+        document.getElementById('login-step1-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-
-            const response = await fetch('/api/auth/login', {
+            
+            const response = await fetch('/api/login/step1', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
-
             const data = await response.json();
-
             if (response.ok) {
-                localStorage.setItem('accessToken', data.accessToken);
-                localStorage.setItem('refreshToken', data.refreshToken);
-
-                messageDiv.className = 'response-box success';
-                messageDiv.innerHTML = `<strong>Authentication Successful.</strong><br>Tokens acquired. Accessing secure profile...`;
-                messageDiv.style.display = 'block';
-
-                setTimeout(() => {
-                    window.location.href = window.location.origin + '/profile';
-                }, 2000);
-
+                if (data.mfa_required) {
+                    currentUsername = data.username;
+                    showView(step2View);
+                } else {
+                    localStorage.setItem('authToken', data.token);
+                    window.location.href = '/dashboard';
+                }
             } else {
-                messageDiv.textContent = data.message;
-                messageDiv.style.display = 'block';
-                messageDiv.className = 'response-box error';
+                showMessage(data.message, true);
             }
         });
+
+        document.getElementById('login-step2-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const mfa_code = document.getElementById('mfa-code').value;
+            const response = await fetch('/api/login/step2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUsername, mfa_code })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                localStorage.setItem('authToken', data.token);
+                window.location.href = '/dashboard';
+            } else {
+                showMessage(data.message, true);
+            }
+        });
+
+        document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const response = await fetch('/api/request-reset', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+            });
+            const data = await response.json();
+            showMessage(data.message, !response.ok);
+        });
+
+        document.getElementById('reset-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newPassword = document.getElementById('new-password').value;
+            const response = await fetch('/api/reset-password', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: resetToken, newPassword })
+            });
+            const data = await response.json();
+            showMessage(data.message, !response.ok);
+            if (response.ok) setTimeout(() => { showView(step1View); }, 2000);
+        });
+
+        // --- Page Load Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('reset_token')) {
+                resetToken = params.get('reset_token');
+                showView(resetView);
+            }
+        });
+        
+        function showMessage(msg, isError = false) {
+            messageDiv.textContent = msg;
+            messageDiv.className = isError ? 'response-box error' : 'response-box success';
+            messageDiv.style.display = 'block';
+        }
     </script>
 </body>
 </html>

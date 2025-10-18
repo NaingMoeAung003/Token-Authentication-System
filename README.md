@@ -1,52 +1,137 @@
-CET324 - Advanced Cyber Security Authentication System
-This project is a secure, token-based authentication system developed for the CET324 Advanced Cyber Security module. It is built with Python and Flask on the backend, uses MongoDB for data storage, and has a dynamic, themed frontend.
+Advanced Authentication System
 
-Key Features
-Secure User Registration & Login: Passwords are never stored directly. They are securely hashed and salted using the bcrypt algorithm.
+This is a secure, token-based authentication system built with Python and Flask. It serves as a comprehensive demonstration of modern web security practices, including email verification, two-factor authentication (2FA), and secure password handling.
 
-JWT Authentication: Implements a professional two-token system:
+Features
 
-Short-Lived Access Tokens (15 mins): Used to access protected resources, minimizing risk if a token is compromised.
+Secure User Registration:
 
-Long-Lived Refresh Tokens (7 days): Used to seamlessly acquire new access tokens without forcing the user to log in again.
+Requires Username, unique Email, and Password.
 
-Role-Based Access Control (RBAC): Users are assigned user or admin roles. Protected API endpoints ensure that only users with the 'admin' role can access sensitive data.
+Real-time password strength validation (length, numbers, special characters).
 
-Bot Prevention: A simple CAPTCHA on the registration form helps prevent automated account creation.
+Includes a "Confirm Password" field.
 
-Cybersecurity-Themed UI: A modern, dark-mode interface built with HTML, CSS, and vanilla JavaScript.
+Protected by a CAPTCHA to prevent automated bot sign-ups.
+
+Mandatory Email Verification:
+
+Accounts are created in an unverified state.
+
+A unique, time-sensitive verification link is sent to the user's email.
+
+Users cannot log in until their email has been verified.
+
+Multi-Factor Authentication (2FA/MFA):
+
+Users can enable Time-Based One-Time Passwords (TOTP) for enhanced security.
+
+Simple setup process using a QR code compatible with apps like Google Authenticator.
+
+Login process becomes a two-step verification for enabled accounts.
+
+Secure Token-Based Sessions:
+
+Uses JSON Web Tokens (JWTs) for authentication.
+
+Tokens are digitally signed with a secret key to ensure integrity.
+
+Tokens have a defined 1-hour expiration time, after which they are invalid.
+
+"Login with Token" Feature:
+
+A dedicated page to demonstrate how a valid, existing token can be used to gain access to protected areas, fulfilling a core assignment requirement.
+
+Secure Password Handling:
+
+Passwords are never stored in plain text.
+
+Uses the bcrypt algorithm for secure hashing and salting.
+
+Includes a secure "Forgot Password" flow that sends a time-sensitive reset link to the user's verified email.
 
 Technology Stack
-Backend: Python, Flask
 
-Database: MongoDB
+Backend: Python with Flask Framework
 
-Security Libraries: PyJWT (for tokens), bcrypt (for password hashing)
+Database: MongoDB (NoSQL)
 
-Frontend: HTML, CSS, JavaScript
+Security Libraries:
 
-How to Run
-Clone the repository:
+bcrypt for password hashing and salting.
 
-git clone <your-repo-url>
+PyJWT for creating and validating JSON Web Tokens.
 
-Navigate into the project directory:
+pyotp & qrcode for Two-Factor Authentication.
 
-cd cybersecurity-auth-system
+Frontend: HTML, CSS, JavaScript (no external frameworks)
 
-Create and activate a virtual environment:
+Environment Management: python-dotenv
+
+Local Setup and Installation
+
+Prerequisites
+
+Python 3.x
+
+Git
+
+MongoDB installed and running locally.
+
+A Gmail account with an App Password generated for sending emails.
+
+Instructions
+
+Clone the Repository:
+
+git clone <your-repository-url>
+cd <repository-name>
+
+
+Create a Virtual Environment:
 
 python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
-Install dependencies:
 
-pip install flask bcrypt pyjwt pymongo
+Activate the Virtual Environment:
 
-Ensure a local MongoDB instance is running.
+On Windows: .\venv\Scripts\activate
 
-Run the application:
+On macOS/Linux: source venv/bin/activate
+
+Install Dependencies:
+
+pip install -r requirements.txt
+
+
+Create the .env File:
+
+In the main project folder, create a file named .env.
+
+Add your secret credentials to this file. This file is ignored by Git and should never be shared.
+
+# Your Gmail address for sending system emails
+EMAIL_USER=your-email@gmail.com
+
+# Your 16-character Google App Password
+EMAIL_PASS=your16characterapppassword
+
+
+Run the Application:
 
 python app.py
 
-Open a web browser and navigate to http://127.0.0.1:5000.
+
+The application will be running at http://127.0.0.1:5000.
+
+How to Use the System
+
+Register: Create a new staff account using the registration form.
+
+Verify Email: Check your email for the verification link and click it. You must do this before you can log in.
+
+Login: Log in with your new credentials.
+
+Access Dashboard: You will be taken to the secure dashboard, where you can see your authentication token and its expiration time.
+
+Enable 2FA (Optional): On the dashboard, scan the QR code with an authenticator app and enter the code to enable 2FA for your account. The next time you log in, you will be prompted for a code.
