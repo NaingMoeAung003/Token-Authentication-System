@@ -6,105 +6,105 @@ Features
 
 Secure User Registration:
 
-Requires Username, unique Email, and Password.
+- Requires Username, unique Email, and Password.
 
-Real-time password strength validation (length, numbers, special characters).
+- Real-time password strength validation (length, numbers, special characters).
 
-Includes a "Confirm Password" field.
+- Includes a "Confirm Password" field.
 
-Protected by a CAPTCHA to prevent automated bot sign-ups.
+- Protected by a CAPTCHA to prevent automated bot sign-ups.
 
 Mandatory Email Verification:
 
-Accounts are created in an unverified state.
+- Accounts are created in an unverified state.
 
-A unique, time-sensitive verification link is sent to the user's email.
+- A unique, time-sensitive verification link is sent to the user's email.
 
-Users cannot log in until their email has been verified.
+- Users cannot log in until their email has been verified.
 
 Multi-Factor Authentication (2FA/MFA):
 
-Users can enable Time-Based One-Time Passwords (TOTP) for enhanced security.
+- Users can enable Time-Based One-Time Passwords (TOTP) for enhanced security.
 
-Simple setup process using a QR code compatible with apps like Google Authenticator.
+- Simple setup process using a QR code compatible with apps like Google Authenticator.
 
-Login process becomes a two-step verification for enabled accounts.
+- Login process becomes a two-step verification for enabled accounts.
 
 Secure Token-Based Sessions:
 
-Uses JSON Web Tokens (JWTs) for authentication.
+- Uses JSON Web Tokens (JWTs) for authentication.
 
-Tokens are digitally signed with a secret key to ensure integrity.
+- Tokens are digitally signed with a secret key to ensure integrity.
 
-Tokens have a defined 1-hour expiration time, after which they are invalid.
+- Tokens have a defined 1-hour expiration time, after which they are invalid.
 
 "Login with Token" Feature:
 
-A dedicated page to demonstrate how a valid, existing token can be used to gain access to protected areas, fulfilling a core assignment requirement.
+- A dedicated page to demonstrate how a valid, existing token can be used to gain access to protected areas, fulfilling a core assignment requirement.
 
 Secure Password Handling:
 
-Passwords are never stored in plain text.
+- Passwords are never stored in plain text.
 
-Uses the bcrypt algorithm for secure hashing and salting.
+- Uses the bcrypt algorithm for secure hashing and salting.
 
-Includes a secure "Forgot Password" flow that sends a time-sensitive reset link to the user's verified email.
+- Includes a secure "Forgot Password" flow that sends a time-sensitive reset link to the user's verified email.
 
 Technology Stack
 
-Backend: Python with Flask Framework
+- Backend: Python with Flask Framework
 
-Database: MongoDB (NoSQL)
+- Database: MongoDB (NoSQL)
 
-Security Libraries:
+- Security Libraries:
 
-bcrypt for password hashing and salting.
+    - bcrypt for password hashing and salting.
 
-PyJWT for creating and validating JSON Web Tokens.
+    - PyJWT for creating and validating JSON Web Tokens.
 
-pyotp & qrcode for Two-Factor Authentication.
+    - pyotp & qrcode for Two-Factor Authentication.
 
-Frontend: HTML, CSS, JavaScript (no external frameworks)
+- Frontend: HTML, CSS, JavaScript (no external frameworks)
 
-Environment Management: python-dotenv
+- Environment Management: python-dotenv
 
 Local Setup and Installation
 
 Prerequisites
 
-Python 3.x
+- Python 3.x
 
-Git
+- Git
 
-MongoDB installed and running locally.
+- MongoDB installed and running locally.
 
-A Gmail account with an App Password generated for sending emails.
+- A Gmail account with an App Password generated for sending emails.
 
 Instructions
 
-Clone the Repository:
+1. Clone the Repository:
 
 git clone <your-repository-url>
 cd <repository-name>
 
 
-Create a Virtual Environment:
+2. Create a Virtual Environment:
 
 python -m venv venv
 
 
 Activate the Virtual Environment:
 
-On Windows: .\venv\Scripts\activate
+3. On Windows: .\venv\Scripts\activate
 
 On macOS/Linux: source venv/bin/activate
 
-Install Dependencies:
+4. Install Dependencies:
 
 pip install -r requirements.txt
 
 
-Create the .env File:
+5. Create the .env File:
 
 In the main project folder, create a file named .env.
 
@@ -117,21 +117,20 @@ EMAIL_USER=your-email@gmail.com
 EMAIL_PASS=your16characterapppassword
 
 
-Run the Application:
+6. Run the Application:
 
 python app.py
 
-
-The application will be running at http://127.0.0.1:5000.
+    - The application will be running at http://127.0.0.1:5000.
 
 How to Use the System
 
-Register: Create a new staff account using the registration form.
+1. Register: Create a new staff account using the registration form.
 
-Verify Email: Check your email for the verification link and click it. You must do this before you can log in.
+2. Verify Email: Check your email for the verification link and click it. You must do this before you can log in.
 
-Login: Log in with your new credentials.
+3. Login: Log in with your new credentials.
 
-Access Dashboard: You will be taken to the secure dashboard, where you can see your authentication token and its expiration time.
+4. Access Dashboard: You will be taken to the secure dashboard, where you can see your authentication token and its expiration time.
 
-Enable 2FA (Optional): On the dashboard, scan the QR code with an authenticator app and enter the code to enable 2FA for your account. The next time you log in, you will be prompted for a code.
+5. Enable 2FA (Optional): On the dashboard, scan the QR code with an authenticator app and enter the code to enable 2FA for your account. The next time you log in, you will be prompted for a code.
